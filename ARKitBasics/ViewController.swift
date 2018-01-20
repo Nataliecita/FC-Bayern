@@ -11,6 +11,8 @@ import ARKit
 
 import Vision
 
+//FOR ADDING A FOCUS SQUARE: https://github.com/gao0122/ARKit-Example-by-Apple
+
 class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	// MARK: - IBOutlets
 
@@ -18,6 +20,9 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	@IBOutlet weak var sessionInfoLabel: UILabel!
 	@IBOutlet weak var sceneView: ARSCNView!
     
+//------------------------- CONSTANTS -------------------------
+    let mWidthOf2DScreen = CGFloat(0.8)
+    let mHeightOf2DScreen = CGFloat(0.45)
     
 //------------------------- SOME BASIC CONFIG STUFF ------------------------------------------------------------------
     override func viewDidAppear(_ animated: Bool) {
@@ -216,10 +221,10 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 //------------------------------------ HERE THE REAL STUFF IS DONE ------------------------------------------------------
     
     
-// ------------------------------------ THIS IS ALL ABOUT DETECTION RECTANGLES ------------------------------------------------------
+// ------------------------------------ THIS IS ALL ABOUT DETECTION RECTANGLES ON A EXISTING PLANE ------------------------------------------------------
     
     
-    func initRectangleDetectionRequest(frame: ARFrame) -> VNDetectRectanglesRequest{
+    func initRectangleDetectionRequestOnExistingPlane(frame: ARFrame) -> VNDetectRectanglesRequest{
         
         
         let rectangleDetectionRequest = VNDetectRectanglesRequest(completionHandler: {(request: VNRequest, error: Error?) in
@@ -307,6 +312,102 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     }
     
     
+// ------------------------------------ THIS IS ALL ABOUT DETECTION RECTANGLES IN THE AIR ------------------------------------------------------
+    
+    
+    func initRectangleDetectionRequest(frame: ARFrame) -> VNDetectRectanglesRequest{
+        
+        
+        let rectangleDetectionRequest = VNDetectRectanglesRequest(completionHandler: {(request: VNRequest, error: Error?) in
+            
+            //------------------ HANDLE TEXT RECTANGLE REQUEST -----------------------
+            print("InitRectangleDetectionRequest HANDLER")
+            guard let observations = request.results else {
+                print("no result")
+                return
+            }
+            
+            let result = observations.map({$0 as? VNRectangleObservation})
+            
+            for observation in result {
+                if let observation = observation {
+                    let hitResultTopLeftArray = frame.hitTest(observation.topLeft.invert(), types: [.featurePoint])
+                    let hitResultTopRightArray = frame.hitTest(observation.topRight.invert(), types: [.featurePoint])
+                    let hitResultBottomLeftArray = frame.hitTest(observation.bottomLeft.invert(), types: [.featurePoint])
+                    let hitResultBottomRightArray = frame.hitTest(observation.bottomRight.invert(), types: [.featurePoint])
+                    guard let hitResultTopLeft = hitResultTopLeftArray.first else {
+                        continue
+                    }
+                    guard let hitResultTopRight = hitResultTopRightArray.first else {
+                        continue
+                    }
+                    guard let hitResultBottomLeft = hitResultBottomLeftArray.first else {
+                        continue
+                    }
+                    guard let hitResultBottomRight = hitResultBottomRightArray.first else {
+                        continue
+                    }
+                    
+                    let topLeftVector = SCNVector3Make(hitResultTopLeft.worldTransform.columns.3.x, hitResultTopLeft.worldTransform.columns.3.y, hitResultTopLeft.worldTransform.columns.3.z)
+                    let topRightVector = SCNVector3Make(hitResultTopRight.worldTransform.columns.3.x, hitResultTopRight.worldTransform.columns.3.y, hitResultTopRight.worldTransform.columns.3.z)
+                    let bottomLeftVector = SCNVector3Make(hitResultBottomLeft.worldTransform.columns.3.x, hitResultBottomLeft.worldTransform.columns.3.y, hitResultBottomLeft.worldTransform.columns.3.z)
+                    let bottomRightVector = SCNVector3Make(hitResultBottomRight.worldTransform.columns.3.x, hitResultBottomRight.worldTransform.columns.3.y, hitResultBottomRight.worldTransform.columns.3.z)
+                    
+                    let vectorHorizontal = topRightVector-topLeftVector
+                    let vectorVertical = bottomLeftVector-topLeftVector
+                    let vectorNormal = vectorHorizontal.cross(vector: vectorVertical)
+                    let vectorToPlaneCenter = bottomRightVector+(topLeftVector-bottomRightVector)*0.5
+                    
+                    self.place2DObject(width: self.mWidthOf2DScreen, height: self.mHeightOf2DScreen, vecNormal: vectorNormal, vecToCenter: vectorToPlaneCenter)
+                    
+                    /*
+                    
+                    //Place object
+                    let plane = SCNPlane(width: CGFloat((bottomRightVector-bottomLeftVector).length()), height: CGFloat((bottomLeftVector-topLeftVector).length()))
+                    
+                    
+                    let vectorToCenterOfRightSide = bottomRightVector+(topRightVector-bottomRightVector)*0.5
+                    let rotationAxis = (bottomLeftVector-bottomRightVector).cross(vector: bottomLeftVector-topLeftVector)
+                    
+                    let rotationAxisCROSSRightSideVector = rotationAxis.cross(vector: topRightVector-bottomRightVector)
+                    let rotationAxisCROSSToCenterOfRightSide = rotationAxis.cross(vector: vectorToCenterOfRightSide)
+                    
+                    let angle = acos((rotationAxisCROSSRightSideVector.dot(vector: rotationAxisCROSSToCenterOfRightSide))/(rotationAxisCROSSToCenterOfRightSide.length()*rotationAxisCROSSRightSideVector.length()))
+                    
+                    plane.firstMaterial?.diffuse.contents = UIColor.white
+                    
+                    let planeNode = SCNNode()
+                    
+                    planeNode.geometry = plane
+                    planeNode.position = vectorToPlaneCenter
+                    planeNode.rotation = SCNVector4Make(rotationAxis.x, rotationAxis.y, rotationAxis.z, angle) // ROTATION AXIS VECTOR SHOULD BE THE NORMAL VECTOR TO PLANE
+                    
+                    self.sceneView.scene.rootNode.addChildNode(planeNode)
+                    
+                    */
+                    
+                    let lineLeft = SCNNode(geometry: SCNGeometry.lineForm(vector1: topLeftVector, vector2: bottomLeftVector))
+                    lineLeft.geometry?.firstMaterial?.diffuse.contents = UIColor.red
+                    let lineRight = SCNNode(geometry: SCNGeometry.lineForm(vector1: topRightVector, vector2: bottomRightVector))
+                    lineRight.geometry?.firstMaterial?.diffuse.contents = UIColor.green
+                    let lineTop = SCNNode(geometry: SCNGeometry.lineForm(vector1: topLeftVector, vector2: topRightVector))
+                    lineTop.geometry?.firstMaterial?.diffuse.contents = UIColor.purple
+                    let lineBottom = SCNNode(geometry: SCNGeometry.lineForm(vector1: bottomLeftVector, vector2: bottomRightVector))
+                    self.sceneView.scene.rootNode.addChildNode(lineLeft)
+                    self.sceneView.scene.rootNode.addChildNode(lineRight)
+                    self.sceneView.scene.rootNode.addChildNode(lineTop)
+                    self.sceneView.scene.rootNode.addChildNode(lineBottom)
+                }
+            }
+            
+            //------------------ HANDLE TEXT RECTANGLE REQUEST -----------------------
+            
+        })
+        
+        
+        return rectangleDetectionRequest
+    }
+    
     
     
     
@@ -334,6 +435,26 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     }
    
     
+//---------------------------------------------- STUFF TO PLACE A 2D OBJECT ----------------------------------------------
+    
+    func place2DObject(width: CGFloat, height: CGFloat, vecNormal: SCNVector3, vecToCenter: SCNVector3) {
+        
+        let plane = SCNPlane(width: width, height: height)
+        plane.firstMaterial?.diffuse.contents = UIColor.white
+        // HOW TO PLACE AN VIDEO: https://stackoverflow.com/questions/42469024/how-do-i-create-a-looping-video-material-in-scenekit-on-ios-in-swift-3
+         
+        let planeNode = SCNNode()
+         
+        planeNode.geometry = plane
+        planeNode.position = vecToCenter //CURRENT NORMAL VECTOR
+        
+        let vecRotation = vecToCenter.cross(vector: vecNormal).normalize()
+        let angle = acos(vecToCenter.normalize().dot(vector: vecNormal.normalize()))
+        
+        planeNode.rotation = SCNVector4Make(vecRotation.x, vecRotation.y, vecRotation.z, angle)
+        
+        self.sceneView.scene.rootNode.addChildNode(planeNode)
+    }
     
     
     
@@ -358,16 +479,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             if let hitTestResult = hitTestResult.first as? ARHitTestResult {
                 let vectorToPoint = SCNVector3Make(hitTestResult.worldTransform.columns.3.x, hitTestResult.worldTransform.columns.3.y, hitTestResult.worldTransform.columns.3.z)
                 
-                /*
-                let plane = SCNPlane(width: CGFloat(5), height: CGFloat(5))
-                plane.firstMaterial?.diffuse.contents = UIColor.white
                 
-                let planeNode = SCNNode()
-                
-                planeNode.geometry = plane
-                planeNode.position = vectorToPoint
-                
-                self.sceneView.scene.rootNode.addChildNode(planeNode)*/
                 
                 
                 

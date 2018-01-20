@@ -54,6 +54,10 @@ extension SCNVector3 {
         return SCNVector3Make(vector.x * scalar, vector.y * scalar, vector.z * scalar)
     }
     
+    static func / (vector: SCNVector3, scalar: Float) -> SCNVector3 {
+        return SCNVector3Make(vector.x / scalar, vector.y / scalar, vector.z / scalar)
+    }
+    
     static func + (left: SCNVector3, right: SCNVector3) -> SCNVector3 {
         return SCNVector3Make(left.x + right.x, left.y + right.y, left.z + right.z)
     }
@@ -70,6 +74,10 @@ extension SCNVector3 {
      */
     func cross(vector: SCNVector3) -> SCNVector3 {
         return SCNVector3Make(y * vector.z - z * vector.y, z * vector.x - x * vector.z, x * vector.y - y * vector.x)
+    }
+    
+    func normalize() -> SCNVector3 {
+        return self/self.length()
     }
 
 }
