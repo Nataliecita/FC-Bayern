@@ -21,8 +21,8 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
 	@IBOutlet weak var sceneView: ARSCNView!
     
 //------------------------- CONSTANTS -------------------------
-    let mWidthOf2DScreen = CGFloat(0.8)
-    let mHeightOf2DScreen = CGFloat(0.45)
+    let mWidthOf2DScreen = CGFloat(0.4)
+    let mHeightOf2DScreen = CGFloat(0.225)
     
 //------------------------- SOME BASIC CONFIG STUFF ------------------------------------------------------------------
     override func viewDidAppear(_ animated: Bool) {
@@ -358,7 +358,7 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
                     let vectorNormal = vectorHorizontal.cross(vector: vectorVertical)
                     let vectorToPlaneCenter = bottomRightVector+(topLeftVector-bottomRightVector)*0.5
                     
-                    self.place2DObject(width: self.mWidthOf2DScreen, height: self.mHeightOf2DScreen, vecNormal: vectorNormal, vecToCenter: vectorToPlaneCenter)
+                    self.place2DObject(width: self.mWidthOf2DScreen, height: self.mHeightOf2DScreen, vecNormal: vectorNormal, vecToCenter: vectorToPlaneCenter, offsetHoriz: Float(0.3), offsetVert: Float(0.3)) //(Positive, Positive) -> topRight
                     
                     /*
                     
@@ -437,29 +437,68 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
     
 //---------------------------------------------- STUFF TO PLACE A 2D OBJECT ----------------------------------------------
     
-    func place2DObject(width: CGFloat, height: CGFloat, vecNormal: SCNVector3, vecToCenter: SCNVector3) {
+    func place2DObject(width: CGFloat, height: CGFloat, vecNormal: SCNVector3, vecToCenter: SCNVector3, offsetHoriz: Float, offsetVert: Float) {
         
         let plane = SCNPlane(width: width, height: height)
         plane.firstMaterial?.diffuse.contents = UIColor.white
         // HOW TO PLACE AN VIDEO: https://stackoverflow.com/questions/42469024/how-do-i-create-a-looping-video-material-in-scenekit-on-ios-in-swift-3
          
         let planeNode = SCNNode()
+        
+        let vecOffsetVert = SCNVector3Make(0, offsetVert, 0)
+        let vecOffsetHoriz = vecNormal.cross(vector: vecOffsetVert).normalize()*offsetHoriz
          
         planeNode.geometry = plane
-        planeNode.position = vecToCenter //CURRENT NORMAL VECTOR
+        planeNode.position = vecToCenter+vecOffsetVert+vecOffsetHoriz //CURRENT NORMAL VECTOR
         
         let vecRotation = vecToCenter.cross(vector: vecNormal).normalize()
         let angle = acos(vecToCenter.normalize().dot(vector: vecNormal.normalize()))
         
-        planeNode.rotation = SCNVector4Make(vecRotation.x, vecRotation.y, vecRotation.z, angle)
+        //planeNode.rotation = SCNVector4Make(vecRotation.x, vecRotation.y, vecRotation.z, angle)
         
         self.sceneView.scene.rootNode.addChildNode(planeNode)
     }
     
     
+// ---------------------------------------------- STUFF TO PLACE A 3D OBJECT IN SPACE ----------------------------------------------
+    func place3DObjectViaHitTesting(centerPoint: CGPoint){
+        let hitTestResult = self.sceneView.hitTest(centerPoint, types: ARHitTestResult.ResultType.featurePoint)
+        
+        if let hitTestResult = hitTestResult.first as? ARHitTestResult {
+            let vectorToPoint = SCNVector3Make(hitTestResult.worldTransform.columns.3.x, hitTestResult.worldTransform.columns.3.y, hitTestResult.worldTransform.columns.3.z)
+            
+            
+            
+            let boxGeometry = SCNBox(width: 0.1, height: 0.1, length: 0.1, chamferRadius: 0.0)
+            let boxNode = SCNNode(geometry: boxGeometry)
+            boxNode.position = vectorToPoint
+            
+            self.sceneView.scene.rootNode.addChildNode(boxNode)
+            
+        }
+    }
+
+//---------------------------------------------- STUFF TO GET THE OBJECT I TOUCH ON THE SCREEN ----------------------------------------------
+    func getObject(touchPoint: CGPoint) -> SCNNode?{
+        // Look for an object directly under the `touchLocation`.
+        let hitTestResult = self.sceneView.hitTest(touchPoint, options: [:])
+        
+        if !hitTestResult.isEmpty {
+            
+        }
+        
+        guard let hitResult = hitTestResult.first else {
+            return nil
+        }
+        let node = hitResult.node as! SCNNode
+        
+        return node
+    }
     
+
     
 // ---------------------------------------------- STUFF THAT HAPPENS IF YOU TOUCH THE SCREEN ----------------------------------------------
+    /*
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         print("TOUCHES BEGAN")
         let screenSize = self.sceneView.bounds.size
@@ -470,29 +509,16 @@ class ViewController: UIViewController, ARSCNViewDelegate, ARSessionDelegate {
             let x = touchPoint.location(in: self.sceneView).x // screenSize.width
             let y = touchPoint.location(in: self.sceneView).y // screenSize.height
             
+            
+            
            print("Point x \(x) y \(y)")
             
             let focusPoint = CGPoint(x: x, y: y) // THIS IS THE POINT IN 2D COORDINATES ON THE SCREEN e.g. (0,0) -> topleft --- (1,1) -> bottomright
             
-            let hitTestResult = self.sceneView.hitTest(focusPoint, types: ARHitTestResult.ResultType.featurePoint)
             
-            if let hitTestResult = hitTestResult.first as? ARHitTestResult {
-                let vectorToPoint = SCNVector3Make(hitTestResult.worldTransform.columns.3.x, hitTestResult.worldTransform.columns.3.y, hitTestResult.worldTransform.columns.3.z)
-                
-                
-                
-                
-                
-                let boxGeometry = SCNBox(width: 0.1, height: 0.1, length: 0.1, chamferRadius: 0.0)
-                let boxNode = SCNNode(geometry: boxGeometry)
-                boxNode.position = vectorToPoint
-                
-                self.sceneView.scene.rootNode.addChildNode(boxNode)
-                
-            }
+            
         }
     }
-    
-    
+ */
     
 }
